@@ -157,7 +157,7 @@ def run_pipeline(images: List[str]) -> None:
                 props_dict['active_grass'] = green_fraction
                 props_dict['dormant_grass'] = brown_fraction
                 
-                overlay_out = Path('output') / ('overlay_' + file)
+                overlay_out = Path('output') / ('overlay_' + filename)
                 cv2.imwrite(str(overlay_out), overlay)
                 
                 prop_df = pd.DataFrame([props_dict])
