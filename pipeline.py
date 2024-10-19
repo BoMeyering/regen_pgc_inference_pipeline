@@ -3,7 +3,7 @@
 
 import os
 import cv2
-from typing import List, Tuple
+from typing import List, Tuple, Union
 from tqdm import tqdm
 import pandas as pd
 import numpy as np
@@ -12,6 +12,22 @@ from pathlib import Path
 from src.api_calls import invoke_endpoints
 from src.img_utils import show_image, draw_bounding_boxes, overlay_preds, map_preds, point_transform, scale_midpoints, scale_points, get_marker_midpoints, back_transform_mask
 from src.veg_indices import clahe_channel
+
+def get_filenames(root_dir: Union[str, Path]) -> List:
+    """
+    Lists all of the jpg images in a given folder
+
+    Args:
+        root_dir (Union[str, Path]): Root directory where the images are stored
+
+    Returns:
+        list: list of images basenames
+    """
+    filenames = []
+    for ext in ['*.jpg', '*.jpeg', '*.JPG', '*.JPEG', '*.png', '*.PNG']:
+        filenames.extend(glob(ext, root_dir=root_dir))
+        
+    return filenames
 
 def class_proportions(preds: np.ndarray) -> Tuple[np.ndarray, dict]:
     """
