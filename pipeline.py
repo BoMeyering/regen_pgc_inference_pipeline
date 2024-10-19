@@ -81,15 +81,18 @@ def run_pipeline(images: List[str]) -> None:
         7: (133, 12, 194) # other_vegetation
     }
 
+    IMAGE_DIR = "assets/images"
+
     # Results Dataframe
     results = pd.DataFrame(columns=['filename', 'background', 'quadrat', 'pgc_grass', 
                                     'pgc_clover', 'broadleaf_weed', 'maize', 'soybean', 
                                     'other_vegetation', 'active_grass', 'dormant_grass'])
 
+    
     # Main loop
-    for img_path in tqdm(images):
-        if os.path.exists(img_path):
-            filename = os.path.basename(img_path)
+    for filename in tqdm(images):
+        if os.path.exists(filename):
+            img_path = os.path.join(IMAGE_DIR, filename)
             print(f'Processing {filename}')
             
             # Invoke endpoints and pull out data
