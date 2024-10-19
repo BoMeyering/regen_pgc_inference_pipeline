@@ -92,8 +92,8 @@ def run_pipeline(images: List[str]) -> None:
     
     # Main loop
     for filename in tqdm(images):
-        if os.path.exists(filename):
-            img_path = os.path.join(IMAGE_DIR, filename)
+        img_path = os.path.join(IMAGE_DIR, filename)
+        if os.path.exists(img_path):
             print(f'Processing {filename}')
             
             # Invoke endpoints and pull out data
@@ -169,3 +169,9 @@ def run_pipeline(images: List[str]) -> None:
     print(results)
     
     results.to_csv('output/output_results.csv')
+
+if __name__ == '__main__':
+    images = get_filenames('assets/images')
+    print(images)
+
+    run_pipeline(images)
