@@ -134,7 +134,7 @@ def run_pipeline(images: List[str]) -> None:
                 preds_transformed, M = point_transform(pgc_preds, mdpts, (1024, 1024))
                 props, props_dict = class_proportions(preds_transformed)
 
-                props_dict['filename'] = file
+                props_dict['filename'] = filename
 
                 # Green Brown Pixel Discrimination
                 clahe_img = clahe_channel(transformed, 20)
