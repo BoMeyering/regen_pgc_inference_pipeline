@@ -105,59 +105,89 @@ def run_pipeline(images: List[str]) -> None:
             # Read in the raw image and set height and width
             img = cv2.imread(img_path)
             h, w = img.shape[:2]
-
-            if len(marker_preds) <= 2:
-                print('Fewer than 2 markers predicted')
-                continue
-            
-            # Get marker midpoint coords
-            mdpts = get_marker_midpoints(marker_preds)
-        
-            # Scale the bbox points and midpoints back up to original size
-            sc_preds = scale_points(marker_preds, (w, h))
-            sc_mdpts = scale_midpoints(mdpts, (w, h))
-
-            # Get segmentation preds and extract grass mask
-            pgc_preds = pgc_preds.astype(np.uint8)
-            grass_mask = np.zeros((1024, 1024))
-
-            # Get grass predictions
-            idx = np.where(pgc_preds==2)
-            grass_mask[idx] = 255
-            grass_mask = grass_mask.astype(np.uint8)
-
-            # Resize raw image to inference size
-            img_resized = cv2.resize(img, (1024, 1024))
-
             try:
-                transformed, M = point_transform(img, sc_mdpts, output_shape=(1024, 1024))
-                grass_mask_transformed, M = point_transform(grass_mask, mdpts, (1024, 1024))
-                preds_transformed, M = point_transform(pgc_preds, mdpts, (1024, 1024))
-                props, props_dict = class_proportions(preds_transformed)
+                if len(marker_preds) <= 2:
+                    print('Fewer than 2 markers predicted, returning predictions over entire image.')
+                    # Resize raw image to inference size
+                    img_resized = cv2.resize(img, (1024, 1024))
+                    # Get segmentation preds and extract grass mask
+                    pgc_preds = pgc_preds.astype(np.uint8)
+                    grass_mask = np.zeros((1024, 1024))
+                    # Get grass predictions
+                    idx = np.where(pgc_preds==2)
+                    grass_mask[idx] = 255
+                    grass_mask = grass_mask.astype(np.uint8)
 
-                props_dict['filename'] = filename
 
-                # Green Brown Pixel Discrimination
-                clahe_img = clahe_channel(transformed, 20)
-                hsv_img = cv2.cvtColor(clahe_img, cv2.COLOR_BGR2HSV)
-                hsv_gr_mask = cv2.inRange(hsv_img, green_lo, green_hi) * grass_mask_transformed
-                hsv_br_mask = cv2.inRange(hsv_img, brown_lo, brown_hi) * grass_mask_transformed
+                    preds_transformed = cv2.resize(pgc_preds, (1024, 1024))
+                    props, props_dict = class_proportions(preds_transformed)
+
+                    props_dict['filename'] = filename
+
+                    # Green Brown Pixel Discrimination
+                    clahe_img = clahe_channel(img_resized, 20)
+                    hsv_img = cv2.cvtColor(clahe_img, cv2.COLOR_BGR2HSV)
+                    hsv_gr_mask = cv2.inRange(hsv_img, green_lo, green_hi) * grass_mask
+                    hsv_br_mask = cv2.inRange(hsv_img, brown_lo, brown_hi) * grass_mask
+
+                    # Create green/brown images and overlay
+                    green = cv2.bitwise_and(img_resized, img_resized, mask=hsv_gr_mask)
+                    brown = cv2.bitwise_and(img_resized, img_resized, mask=hsv_br_mask)
+                    color_mask = map_preds(preds_transformed, mapping)
+                    overlay = overlay_preds(img_resized, color_mask, alpha=.4)
+
+                else:
+                    # Get marker midpoint coords
+                    mdpts = get_marker_midpoints(marker_preds)
                 
-                # Create green/brown images and overlay
-                green = cv2.bitwise_and(transformed, transformed, mask=hsv_gr_mask)
-                brown = cv2.bitwise_and(transformed, transformed, mask=hsv_br_mask)
-                color_mask = map_preds(preds_transformed, mapping)
-                overlay = overlay_preds(transformed, color_mask, alpha=.4)
+                    # Scale the bbox points and midpoints back up to original size
+                    sc_preds = scale_points(marker_preds, (w, h))
+                    sc_mdpts = scale_midpoints(mdpts, (w, h))
 
-                # Calculate green/brown props
-                green_fraction = (hsv_gr_mask > 0).sum()
-                brown_fraction = (hsv_br_mask > 0).sum()
-                total_grass_px = green_fraction + brown_fraction
-                green_fraction /= total_grass_px
-                brown_fraction /= total_grass_px
-                props_dict['active_grass'] = green_fraction
-                props_dict['dormant_grass'] = brown_fraction
+                    # Get segmentation preds and extract grass mask
+                    pgc_preds = pgc_preds.astype(np.uint8)
+                    grass_mask = np.zeros((1024, 1024))
+
+                    # Get grass predictions
+                    idx = np.where(pgc_preds==2)
+                    grass_mask[idx] = 255
+                    grass_mask = grass_mask.astype(np.uint8)
+
+                    # Resize raw image to inference size
+                    img_resized = cv2.resize(img, (1024, 1024))
+
+                    transformed, M = point_transform(img, sc_mdpts, output_shape=(1024, 1024))
+                    grass_mask_transformed, M = point_transform(grass_mask, mdpts, (1024, 1024))
+                    preds_transformed, M = point_transform(pgc_preds, mdpts, (1024, 1024))
+                    props, props_dict = class_proportions(preds_transformed)
+
+                    props_dict['filename'] = filename
+
+                    # Green Brown Pixel Discrimination
+                    clahe_img = clahe_channel(transformed, 20)
+                    hsv_img = cv2.cvtColor(clahe_img, cv2.COLOR_BGR2HSV)
+                    hsv_gr_mask = cv2.inRange(hsv_img, green_lo, green_hi) * grass_mask_transformed
+                    hsv_br_mask = cv2.inRange(hsv_img, brown_lo, brown_hi) * grass_mask_transformed
                 
+                    # Create green/brown images and overlay
+                    green = cv2.bitwise_and(transformed, transformed, mask=hsv_gr_mask)
+                    brown = cv2.bitwise_and(transformed, transformed, mask=hsv_br_mask)
+                    color_mask = map_preds(preds_transformed, mapping)
+                    overlay = overlay_preds(transformed, color_mask, alpha=.4)
+
+                # Calculate green/brown props if pgc_grass
+                if props_dict['pgc_grass'] > 0:
+                    green_fraction = (hsv_gr_mask > 0).sum()
+                    brown_fraction = (hsv_br_mask > 0).sum()
+                    total_grass_px = green_fraction + brown_fraction
+                    green_fraction /= total_grass_px
+                    brown_fraction /= total_grass_px
+                    props_dict['active_grass'] = green_fraction
+                    props_dict['dormant_grass'] = brown_fraction
+                else:
+                    props_dict['active_grass'] = 0
+                    props_dict['dormant_grass'] = 0
+                    
                 overlay_out = Path('output') / ('overlay_' + filename)
                 cv2.imwrite(str(overlay_out), overlay)
                 
