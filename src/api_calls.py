@@ -20,7 +20,6 @@ def invoke_endpoints(path, **kwargs):
     pgc_response = requests.post(PGC_ENDPOINT, files=files_body, **kwargs)
 
     # Format responses
-    print(marker_response.json().keys())
     filename = marker_response.json()['filename']
     data = marker_response.json()['data']
 

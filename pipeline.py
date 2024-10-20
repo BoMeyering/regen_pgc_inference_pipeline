@@ -91,10 +91,11 @@ def run_pipeline(images: List[str]) -> None:
 
     
     # Main loop
-    for filename in tqdm(images):
+    pbar = tqdm(images)
+    for filename in pbar:
         img_path = os.path.join(IMAGE_DIR, filename)
         if os.path.exists(img_path):
-            print(f'Processing {filename}')
+            pbar.set_description(f"Processing image {filename}")
             
             # Invoke endpoints and pull out data
             filename, marker_data, pgc_preds = invoke_endpoints(img_path)
@@ -165,13 +166,13 @@ def run_pipeline(images: List[str]) -> None:
             
             except RuntimeError:
                 print("Fewer than 3 corner points detected. Not transforming the image.")
-
+        else:
+            print(f"File '{filename}' does not exist. Skipping")
     print(results)
     
     results.to_csv('output/output_results.csv')
 
 if __name__ == '__main__':
     images = get_filenames('assets/images')
-    print(images)
 
     run_pipeline(images)
