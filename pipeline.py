@@ -85,7 +85,7 @@ def run_pipeline(images: List[str]) -> None:
     IMAGE_DIR = "assets/images"
 
     # Results Dataframe
-    results = pd.DataFrame(columns=['filename', 'background', 'quadrat', 'pgc_grass', 
+    results = pd.DataFrame(columns=['filename', 'num_markers', 'prediction_zone', 'background', 'quadrat', 'pgc_grass', 
                                     'pgc_clover', 'broadleaf_weed', 'maize', 'soybean', 
                                     'other_vegetation', 'active_grass', 'dormant_grass'])
 
@@ -105,8 +105,9 @@ def run_pipeline(images: List[str]) -> None:
             # Read in the raw image and set height and width
             img = cv2.imread(img_path)
             h, w = img.shape[:2]
+            num_markers = len(marker_preds)
             try:
-                if len(marker_preds) <= 2:
+                if num_markers <= 2:
                     print('Fewer than 2 markers predicted, returning predictions over entire image.')
                     # Resize raw image to inference size
                     img_resized = cv2.resize(img, (1024, 1024))
@@ -122,7 +123,9 @@ def run_pipeline(images: List[str]) -> None:
                     preds_transformed = cv2.resize(pgc_preds, (1024, 1024))
                     props, props_dict = class_proportions(preds_transformed)
 
+                    # Assign metadata to props_dict
                     props_dict['filename'] = filename
+                    props_dict['prediction_zone'] = 'whole_image'
 
                     # Green Brown Pixel Discrimination
                     clahe_img = clahe_channel(img_resized, 20)
@@ -160,8 +163,10 @@ def run_pipeline(images: List[str]) -> None:
                     grass_mask_transformed, M = point_transform(grass_mask, mdpts, (1024, 1024))
                     preds_transformed, M = point_transform(pgc_preds, mdpts, (1024, 1024))
                     props, props_dict = class_proportions(preds_transformed)
-
+                    
+                    # Assign results to props_dict
                     props_dict['filename'] = filename
+                    props_dict['prediction_zone'] = 'marker_roi'
 
                     # Green Brown Pixel Discrimination
                     clahe_img = clahe_channel(transformed, 20)
@@ -175,6 +180,9 @@ def run_pipeline(images: List[str]) -> None:
                     color_mask = map_preds(preds_transformed, mapping)
                     overlay = overlay_preds(transformed, color_mask, alpha=.4)
 
+                # Assign the number of markers in the results
+                props_dict['num_markers'] = num_markers
+
                 # Calculate green/brown props if pgc_grass
                 if props_dict['pgc_grass'] > 0:
                     green_fraction = (hsv_gr_mask > 0).sum()
@@ -187,6 +195,8 @@ def run_pipeline(images: List[str]) -> None:
                 else:
                     props_dict['active_grass'] = 0
                     props_dict['dormant_grass'] = 0
+                
+
                     
                 overlay_out = Path('output') / ('overlay_' + filename)
                 cv2.imwrite(str(overlay_out), overlay)

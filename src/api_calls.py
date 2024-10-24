@@ -4,8 +4,13 @@
 import requests
 import numpy as np
 
-MARKER_ENDPOINT = "https://pgcview.org/api/v1/predict_markers"
-PGC_ENDPOINT = "https://pgcview.org/api/v1/predict_pgc"
+# MARKER_ENDPOINT = "https://pgcview.org/api/v1/predict_markers"
+# PGC_ENDPOINT = "https://pgcview.org/api/v1/predict_pgc"
+
+
+MARKER_ENDPOINT = "http://localhost:8000/api/v1/predict_markers"
+PGC_ENDPOINT = "http://localhost:8000/api/v1/predict_pgc"
+
 
 def invoke_endpoints(path, **kwargs):
     """
