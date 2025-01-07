@@ -7,6 +7,7 @@ from typing import List, Tuple, Union
 from tqdm import tqdm
 from glob import glob
 import pandas as pd
+import polars as pl
 import numpy as np
 from pathlib import Path
 
@@ -209,7 +210,33 @@ def run_pipeline(images: List[str]) -> None:
         else:
             print(f"File '{filename}' does not exist. Skipping")
     print(results)
+
+    # New Polars dataframe addition
+    formatted_results = pl.from_pandas(results)
+
+    # Calculate aggregated results (Add erroneous predictions to correct classes)
+    formatted_results.with_columns(
+        [
+            (pl.col("broadleaf_weed") + pl.col("pgc_clover") + pl.col("other_vegetation")).alias("broadleaf_weed"),
+            (pl.col("background") + pl.col("quadrat")).alias("background")
+        ]    
+    )[['filename', 'num_markers', 'prediction_zone', 'pgc_grass', 'broadleaf_weed', 'background', 'active_grass', 'dormant_grass']] #subset needed columns
     
+    formatted_results = formatted_results.with_columns(
+        (pl.col('pgc_grass') + pl.col('broadleaf_weed') + pl.col('background')).alias('roi_sums')
+    ).with_columns(  # Calculate roi_sums
+        (pl.col('pgc_grass') / pl.col('roi_sums')).alias('Pgc_Cov_prop'),  # Update Pgc_Cov_prop
+        (pl.col('broadleaf_weed') / pl.col('roi_sums')).alias('Wd_Cov_prop'),  # Update Wd_Cov_prop
+        (pl.col('background') / pl.col('roi_sums')).alias('So_Cov_prop')  # Update So_Cov_prop
+    ).drop(pl.col('roi_sums', 'pgc_grass', 'broadleaf_weed', 'background', 'quadrat', 'pgc_clover', 'maize', 'soybean', 'other_vegetation'))\
+    .rename(
+        {
+            'active_grass': 'Pgc_ActFrac_prop',
+            'dormant_grass': "Pgc_DorFrac_prop"
+        }
+    )
+
+    formatted_results.write_csv('output/formatted_results.csv')
     results.to_csv('output/output_results.csv')
 
 if __name__ == '__main__':
