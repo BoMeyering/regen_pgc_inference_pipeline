@@ -7,6 +7,7 @@ from typing import List, Tuple, Union
 from tqdm import tqdm
 from glob import glob
 import pandas as pd
+import polars as pl
 import numpy as np
 from pathlib import Path
 
@@ -14,7 +15,7 @@ from src.api_calls import invoke_endpoints
 from src.img_utils import show_image, draw_bounding_boxes, overlay_preds, map_preds, point_transform, scale_midpoints, scale_points, get_marker_midpoints, back_transform_mask
 from src.veg_indices import clahe_channel
 
-def get_filenames(root_dir: Union[str, Path]) -> List:
+def get_filenames(root_dir: Union[str, Path]='assets/images') -> dict:
     """
     Lists all of the jpg images in a given folder
 
@@ -22,13 +23,18 @@ def get_filenames(root_dir: Union[str, Path]) -> List:
         root_dir (Union[str, Path]): Root directory where the images are stored
 
     Returns:
-        list: list of images basenames
+        dict: img_root_dir and a list of images basenames
     """
     filenames = []
     for ext in ['*.jpg', '*.jpeg', '*.JPG', '*.JPEG', '*.png', '*.PNG']:
         filenames.extend(glob(ext, root_dir=root_dir))
-        
-    return filenames
+    
+    result_dict = {
+        'root_dir': root_dir,
+        'filenames': filenames
+    }
+
+    return result_dict
 
 def class_proportions(preds: np.ndarray) -> Tuple[np.ndarray, dict]:
     """
@@ -50,7 +56,7 @@ def class_proportions(preds: np.ndarray) -> Tuple[np.ndarray, dict]:
     return props, prop_dict
 
 
-def run_pipeline(images: List[str]) -> None:
+def run_pipeline(filenames_dict: dict) -> None:
     """
     Run the PGC View Image Analysis Pipeline
 
@@ -82,7 +88,8 @@ def run_pipeline(images: List[str]) -> None:
         7: (133, 12, 194) # other_vegetation
     }
 
-    IMAGE_DIR = "assets/images"
+    IMAGE_DIR = filenames_dict['root_dir']
+    IMAGE_NAMES = filenames_dict['filenames']
 
     # Results Dataframe
     results = pd.DataFrame(columns=['filename', 'num_markers', 'prediction_zone', 'background', 'quadrat', 'pgc_grass', 
@@ -91,7 +98,7 @@ def run_pipeline(images: List[str]) -> None:
 
     
     # Main loop
-    pbar = tqdm(images)
+    pbar = tqdm(IMAGE_NAMES)
     for filename in pbar:
         img_path = os.path.join(IMAGE_DIR, filename)
         if os.path.exists(img_path):
@@ -209,7 +216,33 @@ def run_pipeline(images: List[str]) -> None:
         else:
             print(f"File '{filename}' does not exist. Skipping")
     print(results)
+
+    # New Polars dataframe addition
+    formatted_results = pl.from_pandas(results)
+
+    # Calculate aggregated results (Add erroneous predictions to correct classes)
+    formatted_results.with_columns(
+        [
+            (pl.col("broadleaf_weed") + pl.col("pgc_clover") + pl.col("other_vegetation")).alias("broadleaf_weed"),
+            (pl.col("background") + pl.col("quadrat")).alias("background")
+        ]    
+    )[['filename', 'num_markers', 'prediction_zone', 'pgc_grass', 'broadleaf_weed', 'background', 'active_grass', 'dormant_grass']] #subset needed columns
     
+    formatted_results = formatted_results.with_columns(
+        (pl.col('pgc_grass') + pl.col('broadleaf_weed') + pl.col('background')).alias('roi_sums')
+    ).with_columns(  # Calculate roi_sums
+        (pl.col('pgc_grass') / pl.col('roi_sums')).alias('Pgc_Cov_prop'),  # Update Pgc_Cov_prop
+        (pl.col('broadleaf_weed') / pl.col('roi_sums')).alias('Wd_Cov_prop'),  # Update Wd_Cov_prop
+        (pl.col('background') / pl.col('roi_sums')).alias('So_Cov_prop')  # Update So_Cov_prop
+    ).drop(pl.col('roi_sums', 'pgc_grass', 'broadleaf_weed', 'background', 'quadrat', 'pgc_clover', 'maize', 'soybean', 'other_vegetation'))\
+    .rename(
+        {
+            'active_grass': 'Pgc_ActFrac_prop',
+            'dormant_grass': "Pgc_DorFrac_prop"
+        }
+    )
+
+    formatted_results.write_csv('output/formatted_results.csv')
     results.to_csv('output/output_results.csv')
 
 if __name__ == '__main__':
