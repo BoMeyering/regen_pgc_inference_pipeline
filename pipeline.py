@@ -15,7 +15,7 @@ from src.api_calls import invoke_endpoints
 from src.img_utils import show_image, draw_bounding_boxes, overlay_preds, map_preds, point_transform, scale_midpoints, scale_points, get_marker_midpoints, back_transform_mask
 from src.veg_indices import clahe_channel
 
-def get_filenames(root_dir: Union[str, Path]) -> dict:
+def get_filenames(root_dir: Union[str, Path]='assets/images') -> dict:
     """
     Lists all of the jpg images in a given folder
 
