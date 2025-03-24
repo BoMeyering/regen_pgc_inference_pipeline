@@ -15,7 +15,7 @@ from src.api_calls import invoke_endpoints
 from src.img_utils import show_image, draw_bounding_boxes, overlay_preds, map_preds, point_transform, scale_midpoints, scale_points, get_marker_midpoints, back_transform_mask
 from src.veg_indices import clahe_channel
 
-def get_filenames(root_dir: Union[str, Path]) -> List:
+def get_filenames(root_dir: Union[str, Path]) -> dict:
     """
     Lists all of the jpg images in a given folder
 
@@ -23,13 +23,18 @@ def get_filenames(root_dir: Union[str, Path]) -> List:
         root_dir (Union[str, Path]): Root directory where the images are stored
 
     Returns:
-        list: list of images basenames
+        dict: img_root_dir and a list of images basenames
     """
     filenames = []
     for ext in ['*.jpg', '*.jpeg', '*.JPG', '*.JPEG', '*.png', '*.PNG']:
         filenames.extend(glob(ext, root_dir=root_dir))
-        
-    return filenames
+    
+    result_dict = {
+        'root_dir': root_dir,
+        'filenames': filenames
+    }
+
+    return result_dict
 
 def class_proportions(preds: np.ndarray) -> Tuple[np.ndarray, dict]:
     """
@@ -51,7 +56,7 @@ def class_proportions(preds: np.ndarray) -> Tuple[np.ndarray, dict]:
     return props, prop_dict
 
 
-def run_pipeline(images: List[str]) -> None:
+def run_pipeline(filenames_dict: dict) -> None:
     """
     Run the PGC View Image Analysis Pipeline
 
@@ -83,7 +88,8 @@ def run_pipeline(images: List[str]) -> None:
         7: (133, 12, 194) # other_vegetation
     }
 
-    IMAGE_DIR = "assets/images"
+    IMAGE_DIR = filenames_dict['root_dir']
+    IMAGE_NAMES = filenames_dict['filenames']
 
     # Results Dataframe
     results = pd.DataFrame(columns=['filename', 'num_markers', 'prediction_zone', 'background', 'quadrat', 'pgc_grass', 
@@ -92,7 +98,7 @@ def run_pipeline(images: List[str]) -> None:
 
     
     # Main loop
-    pbar = tqdm(images)
+    pbar = tqdm(IMAGE_NAMES)
     for filename in pbar:
         img_path = os.path.join(IMAGE_DIR, filename)
         if os.path.exists(img_path):
