@@ -18,8 +18,8 @@ from src.veg_indices import clahe_channel
 from src.transforms import get_pgc_transforms, get_marker_transforms
 import torch.nn.functional as F
 
-MARKER_ENDPOINT = "https://pgcview.org/api/v1/predict_markers"
-PGC_ENDPOINT = "https://pgcview.org/api/v1/predict_pgc"
+MARKER_ENDPOINT = "https://staging.pgcview.org/api/v1/predict_markers"
+PGC_ENDPOINT = "https://staging.pgcview.org/api/v1/predict_pgc"
 
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
